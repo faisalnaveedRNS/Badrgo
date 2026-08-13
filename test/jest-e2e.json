@@ -1,18 +1,38 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
   "rootDir": "./..",
   "testEnvironment": "node",
   "testRegex": ".e2e.spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "setupFilesAfterEnv": ["./test/jest.setup.ts"],
+  "setupFilesAfterEnv": [
+    "./test/jest.setup.ts"
+  ],
   "moduleNameMapper": {
-    "^@modules/(.*)$": "<rootDir>/src/modules/$1",
-    "^@utils/(.*)$": "<rootDir>/src/utils/$1",
-    "^@models$": "<rootDir>/src/models/models",
-    "^@response$": "<rootDir>/src/response/response"
+    "^@contracts/(.*)$": "<rootDir>/libs/common/src/contracts/$1",
+    "^@common/(.*)$": "<rootDir>/libs/common/src/common/$1",
+    "^@utils/(.*)$": "<rootDir>/libs/common/src/utils/$1",
+    "^@kafka/(.*)$": "<rootDir>/libs/kafka/src/$1",
+    "^@cache/(.*)$": "<rootDir>/libs/redis/src/$1",
+    "^@modules/(.*)$": "<rootDir>/apps/user-service/src/modules/$1",
+    "^@gateway/(.*)$": "<rootDir>/apps/gateway/src/$1",
+    "^@wallet/(.*)$": "<rootDir>/apps/wallet-service/src/$1",
+    "^@report/(.*)$": "<rootDir>/apps/report-service/src/$1",
+    "^@models$": "<rootDir>/libs/common/src/models/models",
+    "^@response$": "<rootDir>/libs/common/src/response/response"
   },
-  "collectCoverageFrom": ["<rootDir>/src/**/*.{ts,js}", "!<rootDir>/src/utils/**/*.{ts,js}"],
-  "coveragePathIgnorePatterns": ["/node_modules/", "<rootDir>/src/main.ts"]
+  "collectCoverageFrom": [
+    "<rootDir>/apps/**/*.{ts,js}",
+    "<rootDir>/libs/**/*.{ts,js}",
+    "!<rootDir>/libs/common/src/utils/**/*.{ts,js}"
+  ],
+  "coveragePathIgnorePatterns": [
+    "/node_modules/",
+    "<rootDir>/apps/.*/src/main.ts"
+  ]
 }
