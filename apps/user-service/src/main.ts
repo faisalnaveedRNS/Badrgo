@@ -10,7 +10,7 @@ import compression from 'compression';
 import express from 'express';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { TrimStringsPipe } from '@common/transformer/trim-strings.pipe';
-import { adminModulesImports, AppModule, imports } from '@modules/main/app.module';
+import { AppModule, imports } from '@modules/main/app.module';
 import { AppService } from '@modules/main/app.service';
 import { LoggerService } from '@utils/logger/logger.service';
 
@@ -42,7 +42,6 @@ const bootstrap = async () => {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
 
   swaggerDoc(app, imports, 'docs', 'Client API', 'Endpoints consumed by the end-user application');
-  swaggerDoc(app, adminModulesImports, 'docs/admin', 'Admin API', 'Endpoints consumed by the back office');
 
   await app.startAllMicroservices();
   await app.listen(process.env.USER_HTTP_PORT || 3001);

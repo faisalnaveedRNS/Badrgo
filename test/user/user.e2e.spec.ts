@@ -1,6 +1,6 @@
 import { HttpStatus, INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { ResponseCode } from '@utils/enum';
+import { ResponseCode, ResponseMessage, UserRoles } from '@utils/enum';
 import { AppHelper, createTestApp, TEST_USER } from '../app.helper';
 
 let app: INestApplication;
@@ -35,6 +35,24 @@ describe('GET /user/me', () => {
 
     expect(response.statusCode).toBe(HttpStatus.FORBIDDEN);
   });
+
+  it('rejects a tampered token with 401 rather than 500', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/user/me')
+      .set(helper.authed(`${helper.userToken.slice(0, -1)}X`));
+
+    expect(response.statusCode).toBe(HttpStatus.UNAUTHORIZED);
+    expect(response.body.message).toBe(ResponseMessage.INVALID_TOKEN);
+  });
+
+  it('serves the profile from the view, with the role flattened and no password', async () => {
+    const response = await request(app.getHttpServer()).get('/user/me').set(helper.authed(helper.userToken));
+
+    expect(response.body.data.roleName).toBe(UserRoles.USER);
+    expect(response.body.data).toHaveProperty('fullName');
+    expect(response.body.data.password).toBeUndefined();
+    expect(response.body.data.role).toBeUndefined();
+  });
 });
 
 describe('PATCH /user/me', () => {
@@ -43,6 +61,20 @@ describe('PATCH /user/me', () => {
 
     expect(response.statusCode).toBe(HttpStatus.OK);
     expect(response.body.data.firstName).toBe('John');
+  });
+
+  it('returns the same shape as the GET, computed by the view', async () => {
+    const response = await request(app.getHttpServer()).patch('/user/me').set(helper.authed(helper.userToken)).send({ firstName: 'Jane', lastName: 'Roe' });
+
+    expect(response.body.data.fullName).toBe('Jane Roe');
+    expect(response.body.data.roleName).toBe(UserRoles.USER);
+  });
+
+  it('ignores fields the DTO does not allow', async () => {
+    const response = await request(app.getHttpServer()).patch('/user/me').set(helper.authed(helper.userToken)).send({ firstName: 'Jane', status: 'blocked' });
+
+    expect(response.statusCode).toBe(HttpStatus.OK);
+    expect(response.body.data.status).not.toBe('blocked');
   });
 });
 

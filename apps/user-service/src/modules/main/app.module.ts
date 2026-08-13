@@ -2,8 +2,6 @@ import { MiddlewareConsumer, Module, ModuleMetadata, NestModule, RequestMethod }
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AcceptLanguageResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
-import { AdminAuthModule } from '@modules/admin/auth/auth.module';
-import { AdminUserModule } from '@modules/admin/user/user.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { CommonModule } from '@common/common.module';
 import { LanguageModule } from '@modules/language/language.module';
@@ -15,13 +13,7 @@ import { LoggerModule } from '@utils/logger/logger.module';
 import { SeedModule } from '@modules/seeder/seeder.module';
 import { AppService } from './app.service';
 
-/**
- * Admin-facing modules. Kept separate so `/docs/admin` documents exactly the
- * admin surface and `/docs` exactly the client surface.
- */
-export const adminModulesImports: ModuleMetadata['imports'] = [AdminAuthModule, AdminUserModule];
-
-/** Infrastructure + client-facing modules. */
+/** Infrastructure + client-facing modules. The back office lives in the gateway. */
 export const imports: ModuleMetadata['imports'] = [
   ConfigModule.forRoot({ envFilePath: [AppService.envConfiguration()], isGlobal: true }),
   TypeOrmModule.forRoot(AppService.typeormConfig()),
@@ -43,7 +35,7 @@ export const imports: ModuleMetadata['imports'] = [
 ];
 
 @Module({
-  imports: [...imports, ...adminModulesImports],
+  imports,
   providers: [AppService],
 })
 export class AppModule implements NestModule {

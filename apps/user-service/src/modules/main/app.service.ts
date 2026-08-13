@@ -1,14 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DataSourceOptions } from 'typeorm';
-import { Admin } from '@modules/admin/admin/entities/admin.entity';
 import { Role } from '@modules/role/entities/role.entity';
 import { User } from '@modules/user/entities/user.entity';
-import { AdminView } from '@modules/admin/admin/views/admin.view';
 import { UserView } from '@modules/user/views/user.view';
 import { AppConfig } from '@utils/config';
 
 /** Tables owned by the user service, plus the views every GET reads from. */
-export const entities = [User, Role, Admin, UserView, AdminView];
+export const entities = [User, Role, UserView];
 
 @Injectable()
 export class AppService {

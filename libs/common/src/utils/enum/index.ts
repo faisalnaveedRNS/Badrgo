@@ -83,12 +83,6 @@ export enum ResponseCode {
   FAILED_TO_CREATE_USER = 616,
   FAILED_TO_UPDATE_USER = 617,
 
-  // Admin
-  ADMIN_NOT_FOUND = 630,
-  ADMIN_ALREADY_EXISTS = 631,
-  INVALID_ADMIN_CREDENTIALS = 632,
-  INACTIVE_ADMIN = 633,
-
   // Role
   ROLE_NOT_FOUND = 640,
   INVALID_ROLE = 641,
@@ -142,12 +136,6 @@ export enum ResponseMessage {
   FAILED_TO_CREATE_USER = 'Failed to create user',
   FAILED_TO_UPDATE_USER = 'Failed to update user',
   INVALID_PASSWORD = 'Use 8-50 characters with a mix of letters, numbers & symbols',
-
-  // Admin
-  ADMIN_NOT_FOUND = 'Admin not found',
-  ADMIN_ALREADY_EXISTS = 'Admin with the same email already exists',
-  INVALID_ADMIN_CREDENTIALS = 'Invalid admin credentials',
-  INACTIVE_ADMIN = 'Admin account is not active',
 
   // Role
   ROLE_NOT_FOUND = 'Role not found',
