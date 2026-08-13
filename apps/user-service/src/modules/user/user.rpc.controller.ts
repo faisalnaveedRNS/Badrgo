@@ -2,7 +2,7 @@ import { Controller, UseFilters } from '@nestjs/common';
 import { MessagePattern, Payload, Transport } from '@nestjs/microservices';
 import { RpcAllExceptionsFilter } from '@common/filters/rpc-exception.filter';
 import { UserPattern } from '@contracts/patterns';
-import { User } from './entities/user.entity';
+import { UserView } from './views/user.view';
 import { UserService } from './user.service';
 
 /**
@@ -15,7 +15,7 @@ export class UserRpcController {
   constructor(private readonly service: UserService) {}
 
   @MessagePattern(UserPattern.FIND_BY_ID, Transport.TCP)
-  async findById(@Payload() payload: { id: string }): Promise<User> {
+  async findById(@Payload() payload: { id: string }): Promise<UserView> {
     return this.service.findById(payload.id);
   }
 

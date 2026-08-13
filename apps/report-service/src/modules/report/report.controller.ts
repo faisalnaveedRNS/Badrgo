@@ -4,7 +4,7 @@ import { RpcAllExceptionsFilter } from '@common/filters/rpc-exception.filter';
 import { ReportPattern } from '@contracts/patterns';
 import { PaginationDto } from '@common/dtos/index.dtos';
 import { ReportType } from '@utils/enum';
-import { Report } from './entities/report.entity';
+import { ReportView } from './views/report.view';
 import { ReportService } from './report.service';
 
 /** Query side of the report service; the write side is the Kafka consumer. */
@@ -14,12 +14,12 @@ export class ReportController {
   constructor(private readonly service: ReportService) {}
 
   @MessagePattern(ReportPattern.REQUEST, Transport.TCP)
-  async request(@Payload() payload: { type: ReportType; requestedBy: string; params: Record<string, any> }): Promise<Report> {
+  async request(@Payload() payload: { type: ReportType; requestedBy: string; params: Record<string, any> }): Promise<ReportView> {
     return this.service.request(payload.type, payload.requestedBy, payload.params);
   }
 
   @MessagePattern(ReportPattern.FIND_BY_ID, Transport.TCP)
-  async findById(@Payload() payload: { id: string }): Promise<Report> {
+  async findById(@Payload() payload: { id: string }): Promise<ReportView> {
     return this.service.findById(payload.id);
   }
 

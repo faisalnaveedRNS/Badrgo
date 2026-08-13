@@ -1,6 +1,6 @@
-import { User } from '@modules/user/entities/user.entity';
+import { UserView } from '@modules/user/views/user.view';
 
 export interface LoginResult {
-  user: User;
+  user: UserView;
   token: string;
 }

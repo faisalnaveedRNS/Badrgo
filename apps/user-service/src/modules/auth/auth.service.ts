@@ -13,7 +13,9 @@ export class AuthService {
   constructor(private readonly userService: UserService) {}
 
   async register(payload: RegisterDto): Promise<LoginResult> {
-    const user = await this.userService.create(payload.email, payload.password);
+    const created = await this.userService.create(payload.email, payload.password);
+    const user = await this.userService.findById(created.id);
+
     return { user, token: this.sign(user.id, user.email) };
   }
 

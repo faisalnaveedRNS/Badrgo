@@ -15,6 +15,15 @@ export class ReportModel {
 
   @ApiProperty({ example: { wallets: 3, totalBalance: '5250.00000000' } })
   result: Record<string, any>;
+
+  @ApiProperty({ example: 3 })
+  walletCount: number;
+
+  @ApiProperty({ example: '5250.00000000' })
+  totalBalance: string;
+
+  @ApiProperty({ example: 128 })
+  transactionCount: number;
 }
 
 export class ReportResponse extends Response {

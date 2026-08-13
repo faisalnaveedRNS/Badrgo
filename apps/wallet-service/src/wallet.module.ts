@@ -13,10 +13,12 @@ import { OutboxModule } from './modules/outbox/outbox.module';
 import { Transaction } from './modules/transaction/entities/transaction.entity';
 import { TransactionModule } from './modules/transaction/transaction.module';
 import { Wallet } from './modules/wallet/entities/wallet.entity';
+import { TransactionView } from './modules/transaction/views/transaction.view';
+import { WalletView } from './modules/wallet/views/wallet.view';
 import { WalletModule } from './modules/wallet/wallet.module';
 
-/** Tables owned by the wallet service. No other service reads them. */
-export const entities = [Wallet, Transaction, OutboxEvent];
+/** Tables owned by the wallet service, plus the views every GET reads from. */
+export const entities = [Wallet, Transaction, OutboxEvent, WalletView, TransactionView];
 
 @Module({
   imports: [

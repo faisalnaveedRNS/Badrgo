@@ -7,9 +7,10 @@ import { WalletProjection } from './entities/wallet-projection.entity';
 import { ProjectionService } from './projection.service';
 import { ReportController } from './report.controller';
 import { ReportService } from './report.service';
+import { ReportView } from './views/report.view';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Report, WalletProjection])],
+  imports: [TypeOrmModule.forFeature([Report, WalletProjection, ReportView])],
   controllers: [ReportController, WalletConsumer, HealthController],
   providers: [ReportService, ProjectionService],
   exports: [ReportService],

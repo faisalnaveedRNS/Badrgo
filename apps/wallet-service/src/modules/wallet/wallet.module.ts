@@ -4,11 +4,12 @@ import { IdempotencyModule } from '@wallet/modules/idempotency/idempotency.modul
 import { OutboxModule } from '@wallet/modules/outbox/outbox.module';
 import { TransactionModule } from '@wallet/modules/transaction/transaction.module';
 import { Wallet } from './entities/wallet.entity';
+import { WalletView } from './views/wallet.view';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Wallet]), TransactionModule, OutboxModule, IdempotencyModule],
+  imports: [TypeOrmModule.forFeature([Wallet, WalletView]), TransactionModule, OutboxModule, IdempotencyModule],
   controllers: [WalletController],
   providers: [WalletService],
   exports: [WalletService],

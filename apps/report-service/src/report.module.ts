@@ -7,9 +7,10 @@ import { LoggerModule } from '@utils/logger/logger.module';
 import { Report } from './modules/report/entities/report.entity';
 import { WalletProjection } from './modules/report/entities/wallet-projection.entity';
 import { ReportModule } from './modules/report/report.module';
+import { ReportView } from './modules/report/views/report.view';
 
 /** Tables owned by the report service: its own read models, nothing shared. */
-export const entities = [Report, WalletProjection];
+export const entities = [Report, WalletProjection, ReportView];
 
 @Module({
   imports: [

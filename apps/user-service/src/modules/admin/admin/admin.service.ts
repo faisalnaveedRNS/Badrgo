@@ -6,11 +6,13 @@ import { UserRoles } from '@utils/enum';
 import { Hash } from '@utils/hash';
 import { AdminAlreadyExists, AdminNotFound } from './admin.exception';
 import { Admin } from './entities/admin.entity';
+import { AdminView } from './views/admin.view';
 
 @Injectable()
 export class AdminService {
   constructor(
     @InjectRepository(Admin) private readonly adminRepository: Repository<Admin>,
+    @InjectRepository(AdminView) private readonly adminView: Repository<AdminView>,
     private readonly roleService: RoleService,
   ) {}
 
@@ -33,8 +35,9 @@ export class AdminService {
     return this.adminRepository.findOne({ where: { email }, select: { id: true, email: true, password: true, status: true } });
   }
 
-  async findById(id: string): Promise<Admin> {
-    const admin = await this.adminRepository.findOne({ where: { id } });
+  /** Read path: served by the view, never the table. */
+  async findById(id: string): Promise<AdminView> {
+    const admin = await this.adminView.findOne({ where: { id } });
     if (!admin) new AdminNotFound();
     return admin;
   }
