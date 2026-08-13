@@ -2,6 +2,10 @@
 
 <https://github.com/faisalnaveedRNS/Badrgo>
 
+# Architecture
+
+![Badrgo architecture](architecture/architecture.svg)
+
 # Stack
 
 NestJS 11 · TypeORM 1 (Postgres 16) · Kafka (KRaft) · ClickHouse 24 · Redis 7 · JWT auth · nestjs-i18n · Swagger · Jest + Supertest
