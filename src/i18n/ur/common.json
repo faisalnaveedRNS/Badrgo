@@ -1,0 +1,8 @@
+{
+  "welcome": "بدرگو میں خوش آمدید، {name}۔",
+  "greeting": "سلام!",
+  "language_changed": "زبان کامیابی سے تبدیل ہو گئی۔",
+  "user_not_found": "صارف نہیں ملا۔",
+  "invalid_credentials": "ای میل یا پاس ورڈ غلط ہے۔",
+  "forbidden": "آپ کو یہ عمل کرنے کی اجازت نہیں ہے۔"
+}

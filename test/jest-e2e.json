@@ -1,0 +1,18 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "./..",
+  "testEnvironment": "node",
+  "testRegex": ".e2e.spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "setupFilesAfterEnv": ["./test/jest.setup.ts"],
+  "moduleNameMapper": {
+    "^@modules/(.*)$": "<rootDir>/src/modules/$1",
+    "^@utils/(.*)$": "<rootDir>/src/utils/$1",
+    "^@models$": "<rootDir>/src/models/models",
+    "^@response$": "<rootDir>/src/response/response"
+  },
+  "collectCoverageFrom": ["<rootDir>/src/**/*.{ts,js}", "!<rootDir>/src/utils/**/*.{ts,js}"],
+  "coveragePathIgnorePatterns": ["/node_modules/", "<rootDir>/src/main.ts"]
+}
