@@ -82,6 +82,8 @@ On first boot the user service seeds the three roles and the super admin from `S
 apps/
   gateway/          the only public process — no database of its own
     modules/client/   TCP clients + `send()` (error translation, timeouts)
+    modules/auth/     public signup + login, rate limited hardest
+    modules/user/     GET /user/me, cached in Redis
     modules/wallet/   HTTP surface over the wallet service
     modules/report/   admin HTTP surface over the report service
   user-service/     hybrid: keeps its HTTP surface, adds a TCP face
@@ -380,8 +382,9 @@ Trade-offs worth knowing:
 
 ## Not built yet
 
-Deliberately left for the next pass: gateway proxying of auth/user endpoints (the
-user service still serves its own HTTP surface), an audit trail (ClickHouse now
+Deliberately left for the next pass: gateway proxying of the remaining user
+endpoints (profile update, change password, and the whole admin user surface —
+the user service still serves those over its own HTTP), an audit trail (ClickHouse now
 covers analytics, but nothing writes an immutable audit log), migrations in place
 of `DB_SYNC` and of the ClickHouse init script, and e2e coverage for the wallet
 and report services.

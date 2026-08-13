@@ -6,9 +6,11 @@ import { RedisModule } from '@cache/index';
 import { AppConfig, I18N_PATH } from '@utils/config';
 import { LoggerMiddleware } from '@utils/logger/logger.middleware';
 import { LoggerModule } from '@utils/logger/logger.module';
+import { GatewayAuthModule } from './modules/auth/auth.module';
 import { ServiceClientModule } from './modules/client/client.module';
 import { HealthModule } from './modules/health/health.module';
 import { GatewayReportModule } from './modules/report/report.module';
+import { GatewayUserModule } from './modules/user/user.module';
 import { GatewayWalletModule } from './modules/wallet/wallet.module';
 
 /**
@@ -34,6 +36,8 @@ export const imports: ModuleMetadata['imports'] = [
   RedisModule,
   ServiceClientModule,
   HealthModule,
+  GatewayAuthModule,
+  GatewayUserModule,
   GatewayWalletModule,
 ];
 

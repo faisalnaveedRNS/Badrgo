@@ -5,7 +5,7 @@ import { EStatus, UserRoles } from '@utils/enum';
 import { Hash } from '@utils/hash';
 import { AuthToken } from '@utils/jwt';
 import { InvalidCredentials } from './auth.exception';
-import { LoginDto, RegisterDto } from './common/auth.dto';
+import { LoginDto, RegisterDto } from '@contracts/auth.dto';
 import { LoginResult } from './common/auth.interface';
 
 @Injectable()

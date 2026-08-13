@@ -3,6 +3,10 @@ import { IsEmail, IsNotEmpty, Matches } from 'class-validator';
 import { PASSWORD_REGEX } from '@common/dtos/index.dtos';
 import { ResponseMessage } from '@utils/enum';
 
+/**
+ * Credentials exchanged between the gateway and the user service. Validated at
+ * the gateway before the call, and again by the service's ValidationPipe.
+ */
 export class RegisterDto {
   @ApiProperty({ example: 'john@example.com' })
   @IsNotEmpty()

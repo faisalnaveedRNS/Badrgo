@@ -5,6 +5,11 @@
  * Anything that should fan out to several consumers goes to Kafka instead —
  * see `@kafka/kafka.topics`.
  */
+export enum AuthPattern {
+  REGISTER = 'auth.register',
+  LOGIN = 'auth.login',
+}
+
 export enum UserPattern {
   FIND_BY_ID = 'user.find_by_id',
   EXISTS = 'user.exists',
