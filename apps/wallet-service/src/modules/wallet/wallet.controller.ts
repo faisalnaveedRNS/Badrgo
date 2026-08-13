@@ -6,8 +6,8 @@ import { CreateWalletDto, WalletOperationDto } from '@contracts/wallet.dto';
 import { PaginationDto } from '@common/dtos/index.dtos';
 import { IdempotencyService } from '@wallet/modules/idempotency/idempotency.service';
 import { TransactionService } from '@wallet/modules/transaction/transaction.service';
-import { Transaction } from '@wallet/modules/transaction/entities/transaction.entity';
-import { Wallet } from './entities/wallet.entity';
+import { TransactionView } from '@wallet/modules/transaction/views/transaction.view';
+import { WalletView } from './views/wallet.view';
 import { DuplicateRequest } from './wallet.exception';
 import { WalletService } from './wallet.service';
 
@@ -26,27 +26,27 @@ export class WalletController {
   ) {}
 
   @MessagePattern(WalletPattern.CREATE)
-  async create(@Payload() payload: CreateWalletDto): Promise<Wallet> {
+  async create(@Payload() payload: CreateWalletDto): Promise<WalletView> {
     return this.service.create(payload);
   }
 
   @MessagePattern(WalletPattern.FIND_BY_ID)
-  async findById(@Payload() payload: { id: string }): Promise<Wallet> {
+  async findById(@Payload() payload: { id: string }): Promise<WalletView> {
     return this.service.findById(payload.id);
   }
 
   @MessagePattern(WalletPattern.FIND_BY_USER)
-  async findByUser(@Payload() payload: { userId: string }): Promise<Wallet[]> {
+  async findByUser(@Payload() payload: { userId: string }): Promise<WalletView[]> {
     return this.service.findByUser(payload.userId);
   }
 
   @MessagePattern(WalletPattern.CREDIT)
-  async credit(@Payload() payload: WalletOperationDto): Promise<Transaction> {
+  async credit(@Payload() payload: WalletOperationDto): Promise<TransactionView> {
     return this.idempotent(payload, WalletPattern.CREDIT, () => this.service.credit(payload));
   }
 
   @MessagePattern(WalletPattern.DEBIT)
-  async debit(@Payload() payload: WalletOperationDto): Promise<Transaction> {
+  async debit(@Payload() payload: WalletOperationDto): Promise<TransactionView> {
     return this.idempotent(payload, WalletPattern.DEBIT, () => this.service.debit(payload));
   }
 
@@ -63,7 +63,7 @@ export class WalletController {
    * rejected rather than replayed. A failed operation gives its key back, since
    * nothing was posted and the caller is entitled to retry.
    */
-  private async idempotent(payload: WalletOperationDto, scope: string, operation: () => Promise<Transaction>): Promise<Transaction> {
+  private async idempotent(payload: WalletOperationDto, scope: string, operation: () => Promise<TransactionView>): Promise<TransactionView> {
     if (!(await this.idempotencyService.claim(payload.idempotencyKey, scope))) new DuplicateRequest();
 
     try {

@@ -16,7 +16,11 @@ export abstract class Helper {
    * Wipes every table between suites so each spec file starts from a known state.
    */
   public async truncateAll(): Promise<void> {
-    const tables = this.dataSource.entityMetadatas.map((entity) => `"${entity.tableName}"`).join(', ');
+    // Views are derived from the tables below — truncating one is an error.
+    const tables = this.dataSource.entityMetadatas
+      .filter((entity) => entity.tableType === 'regular')
+      .map((entity) => `"${entity.tableName}"`)
+      .join(', ');
     if (tables) await this.dataSource.query(`TRUNCATE ${tables} RESTART IDENTITY CASCADE;`);
   }
 

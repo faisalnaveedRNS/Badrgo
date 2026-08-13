@@ -6,7 +6,10 @@ import { KafkaTopic } from '@kafka/kafka.topics';
 import { EStatus, TransactionStatus, TransactionType } from '@utils/enum';
 import { Transaction } from '@wallet/modules/transaction/entities/transaction.entity';
 import { OutboxService } from '@wallet/modules/outbox/outbox.service';
+import { TransactionService } from '@wallet/modules/transaction/transaction.service';
+import { TransactionView } from '@wallet/modules/transaction/views/transaction.view';
 import { Wallet } from './entities/wallet.entity';
+import { WalletView } from './views/wallet.view';
 import { CurrencyMismatch, InsufficientBalance, InvalidAmount, WalletAlreadyExists, WalletInactive, WalletNotFound } from './wallet.exception';
 
 /** Money is decimal all the way through — parsed only to compare, never to store. */
@@ -17,15 +20,17 @@ const format = (value: number): string => value.toFixed(8);
 export class WalletService {
   constructor(
     @InjectRepository(Wallet) private readonly walletRepository: Repository<Wallet>,
+    @InjectRepository(WalletView) private readonly walletView: Repository<WalletView>,
     private readonly dataSource: DataSource,
     private readonly outboxService: OutboxService,
+    private readonly transactionService: TransactionService,
   ) {}
 
-  async create(payload: CreateWalletDto): Promise<Wallet> {
+  async create(payload: CreateWalletDto): Promise<WalletView> {
     const { userId, currency } = payload;
     if (await this.walletRepository.exists({ where: { userId, currency } })) new WalletAlreadyExists();
 
-    return this.dataSource.transaction(async (manager) => {
+    const created = await this.dataSource.transaction(async (manager) => {
       const wallet = await manager.save(manager.create(Wallet, { userId, currency, balance: format(0), availableBalance: format(0) }));
 
       await this.outboxService.record(manager, KafkaTopic.WALLET_CREATED, 'wallet', wallet.id, {
@@ -36,23 +41,29 @@ export class WalletService {
 
       return wallet;
     });
+
+    return this.findById(created.id);
   }
 
-  async findById(id: string): Promise<Wallet> {
-    const wallet = await this.walletRepository.findOne({ where: { id } });
+  /**
+   * Read path: the view, which carries the ledger totals alongside the balance.
+   * The table is only touched on the write path, under a row lock.
+   */
+  async findById(id: string): Promise<WalletView> {
+    const wallet = await this.walletView.findOne({ where: { id } });
     if (!wallet) new WalletNotFound();
     return wallet;
   }
 
-  async findByUser(userId: string): Promise<Wallet[]> {
-    return this.walletRepository.find({ where: { userId }, order: { createdAt: 'DESC' } });
+  async findByUser(userId: string): Promise<WalletView[]> {
+    return this.walletView.find({ where: { userId }, order: { createdAt: 'DESC' } });
   }
 
-  async credit(payload: WalletOperationDto): Promise<Transaction> {
+  async credit(payload: WalletOperationDto): Promise<TransactionView> {
     return this.post(payload, TransactionType.CREDIT);
   }
 
-  async debit(payload: WalletOperationDto): Promise<Transaction> {
+  async debit(payload: WalletOperationDto): Promise<TransactionView> {
     return this.post(payload, TransactionType.DEBIT);
   }
 
@@ -63,11 +74,11 @@ export class WalletService {
    * the event can never describe a balance that was rolled back. The wallet row
    * is locked pessimistically for the duration to serialise concurrent movements.
    */
-  private async post(payload: WalletOperationDto, type: TransactionType): Promise<Transaction> {
+  private async post(payload: WalletOperationDto, type: TransactionType): Promise<TransactionView> {
     const amount = toAmount(payload.amount);
     if (!Number.isFinite(amount) || amount <= 0) new InvalidAmount();
 
-    return this.dataSource.transaction(async (manager) => {
+    const posted = await this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, { where: { id: payload.walletId }, lock: { mode: 'pessimistic_write' } });
 
       if (!wallet) new WalletNotFound();
@@ -113,5 +124,8 @@ export class WalletService {
 
       return transaction;
     });
+
+    // Re-read after commit: the view is the shape every caller gets.
+    return this.transactionService.findById(posted.id);
   }
 }

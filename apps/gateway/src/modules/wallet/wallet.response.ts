@@ -25,6 +25,18 @@ export class WalletModel {
 
   @ApiProperty({ enum: EStatus, example: EStatus.ACTIVE })
   status: EStatus;
+
+  @ApiProperty({ example: 42, description: 'Posted ledger lines for this wallet' })
+  transactionCount: number;
+
+  @ApiProperty({ example: '12000.00000000' })
+  totalCredited: string;
+
+  @ApiProperty({ example: '10250.00000000' })
+  totalDebited: string;
+
+  @ApiProperty({ example: '2024-01-29T08:12:24.980Z' })
+  lastTransactionAt: Date;
 }
 
 export class TransactionModel {
@@ -51,6 +63,9 @@ export class TransactionModel {
 
   @ApiProperty({ example: 'order_8127' })
   reference: string;
+
+  @ApiProperty({ example: '-250.00000000', description: 'Credits positive, debits negative' })
+  signedAmount: string;
 }
 
 export class WalletResponse extends Response {

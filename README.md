@@ -74,10 +74,15 @@ apps/
     modules/report/   admin HTTP surface over the report service
   user-service/     hybrid: keeps its HTTP surface, adds a TCP face
     modules/{auth,user,role,admin,language,seeder,main}
+      user/views/       user_view      (role flattened, soft-deletes excluded)
+      admin/admin/views/admin_view
   wallet-service/   pure TCP microservice, produces to Kafka via the outbox
     modules/{wallet,transaction,outbox,idempotency}
+      wallet/views/       wallet_view      (ledger totals + balance drift)
+      transaction/views/  transaction_view (signed amounts, owning user)
   report-service/   TCP queries + Kafka consumer building a read model
     modules/{report,consumer}
+      report/views/     report_view      (headline numbers lifted out of JSON)
 libs/
   common/           response envelope, Exception layer, base entity, DTOs,
                     decorators, guards, filters (HTTP + RPC), i18n, config, utils
@@ -234,19 +239,61 @@ entitled to retry with the same key. Successful ones hold the reservation for
 request carrying it is a new transaction. The unique `reference` on the ledger
 line is the second line of defence.
 
+### 9. Reads go through views
+
+Every module owns a `views/` directory of TypeORM `@ViewEntity` classes, and
+**every GET reads from a view — never from the table repository**:
+
+```ts
+async findById(id: string): Promise<WalletView> {
+  const wallet = await this.walletView.findOne({ where: { id } });   // view
+  if (!wallet) new WalletNotFound();
+  return wallet;
+}
+```
+
+The repository is reserved for writes. `WalletService.post()` still locks and
+updates the `wallets` row; the read path never touches it.
+
+A view is where joins and aggregates belong, so a read is one indexed scan
+instead of N+1 lazy loads:
+
+| View | What it adds over the table |
+|---|---|
+| `user_view` / `admin_view` | role flattened to `roleName`, `fullName`, soft-deletes filtered out |
+| `wallet_view` | `transactionCount`, `totalCredited`, `totalDebited`, `lastTransactionAt`, and `balanceDrift` — the stored balance minus the posted ledger sum, which should always be `0.00000000` |
+| `transaction_view` | owning `userId`, and `signedAmount` (credits +, debits −) so a page sums without re-reading `type` |
+| `report_view` | `walletCount` / `totalBalance` / `transactionCount` lifted out of the `result` JSON into sortable columns, plus `generationSeconds` |
+
+Three rules that keep this consistent:
+
+1. **Views are registered like entities** — in the module's `forFeature([...])`
+   *and* in the app's `entities` array, or `synchronize` will not create them.
+2. **Writes re-read the view before returning**, so a POST/PATCH response has the
+   same shape as the GET for that resource. Responses declare the view as their
+   Swagger type.
+3. **Column names go through the snake_case naming strategy**, so a `netTokenAmount`
+   property must be aliased `AS net_token_amount` in the SQL.
+
+Changing a view's SQL is a schema change: `synchronize` drops and recreates it on
+boot. Under migrations, that becomes an explicit `DROP VIEW` / `CREATE VIEW` pair —
+and views must be dropped before the tables they depend on.
+
 ## Adding a feature module
 
 1. Decide who owns it. New bounded context → a new app under `apps/`; behaviour on
    existing data → a module inside that service.
-2. `modules/<feature>/` with `entities/`, `common/` (DTOs), `<feature>.{module,controller,service,exception,response}.ts`
-3. Add codes/messages to `@utils/enum`, error classes to `<feature>.exception.ts`
-4. If the gateway exposes it: add the pattern to `@contracts/patterns`, a shared
+2. `modules/<feature>/` with `entities/`, `views/`, `common/` (DTOs), `<feature>.{module,controller,service,exception,response}.ts`
+3. Add a `views/<feature>.view.ts` and serve every GET from it; register it in
+   `forFeature([...])` and the app's `entities` array
+4. Add codes/messages to `@utils/enum`, error classes to `<feature>.exception.ts`
+5. If the gateway exposes it: add the pattern to `@contracts/patterns`, a shared
    payload DTO to `@contracts/`, an RPC controller in the service, and an HTTP
    controller + response classes in the gateway.
-5. If it emits events: add the topic to `@kafka/kafka.topics`, record to the outbox
+6. If it emits events: add the topic to `@kafka/kafka.topics`, record to the outbox
    inside the transaction, and make the consumer idempotent.
-6. Register the module in `imports` (client) or `adminModulesImports` (admin).
-7. Add `test/<feature>/<feature>.e2e.spec.ts`.
+7. Register the module in `imports` (client) or `adminModulesImports` (admin).
+8. Add `test/<feature>/<feature>.e2e.spec.ts`.
 
 ## Not built yet
 

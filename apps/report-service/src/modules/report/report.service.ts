@@ -8,11 +8,13 @@ import { paginationMeta } from '@utils/helper';
 import { Report } from './entities/report.entity';
 import { WalletProjection } from './entities/wallet-projection.entity';
 import { ReportNotFound } from './report.exception';
+import { ReportView } from './views/report.view';
 
 @Injectable()
 export class ReportService {
   constructor(
     @InjectRepository(Report) private readonly reportRepository: Repository<Report>,
+    @InjectRepository(ReportView) private readonly reportView: Repository<ReportView>,
     @InjectRepository(WalletProjection) private readonly projectionRepository: Repository<WalletProjection>,
   ) {}
 
@@ -20,22 +22,25 @@ export class ReportService {
    * Queues a report. Reads come from the local projection, so generating one
    * never touches the wallet service.
    */
-  async request(type: ReportType, requestedBy: string, params: Record<string, any>): Promise<Report> {
+  async request(type: ReportType, requestedBy: string, params: Record<string, any>): Promise<ReportView> {
     const report = await this.reportRepository.save(this.reportRepository.create({ type, requestedBy, params, status: ReportStatus.PENDING }));
-    return this.generate(report);
+    const generated = await this.generate(report);
+
+    return this.findById(generated.id);
   }
 
-  async findById(id: string): Promise<Report> {
-    const report = await this.reportRepository.findOne({ where: { id } });
+  /** Read path: the view, which lifts the headline numbers out of `result`. */
+  async findById(id: string): Promise<ReportView> {
+    const report = await this.reportView.findOne({ where: { id } });
     if (!report) new ReportNotFound();
     return report;
   }
 
-  async findAll(query: PaginationDto): Promise<{ data: Report[]; meta: PaginationMeta }> {
+  async findAll(query: PaginationDto): Promise<{ data: ReportView[]; meta: PaginationMeta }> {
     const page = query?.page || 1;
     const pageSize = query?.pageSize || 10;
 
-    const [data, count] = await this.reportRepository.findAndCount({
+    const [data, count] = await this.reportView.findAndCount({
       order: { createdAt: query?.sort === 'asc' ? 'ASC' : 'DESC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
