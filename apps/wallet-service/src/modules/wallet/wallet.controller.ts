@@ -56,23 +56,18 @@ export class WalletController {
   }
 
   /**
-   * Runs `operation` at most once per idempotency key. Without a key the
-   * operation runs as-is — the unique `reference` on the ledger line is then
-   * the only thing standing between a retry and a double post.
+   * Runs `operation` at most once per idempotency key.
+   *
+   * The key is reserved in Redis before any money moves. A key that is already
+   * held means this transaction was already accepted, so the duplicate is
+   * rejected rather than replayed. A failed operation gives its key back, since
+   * nothing was posted and the caller is entitled to retry.
    */
   private async idempotent(payload: WalletOperationDto, scope: string, operation: () => Promise<Transaction>): Promise<Transaction> {
-    if (!payload.idempotencyKey) return operation();
-
-    const claim = await this.idempotencyService.claim(payload.idempotencyKey, scope, payload);
-    if (claim) {
-      if (!claim.replay) new DuplicateRequest();
-      return claim.replay as Transaction;
-    }
+    if (!(await this.idempotencyService.claim(payload.idempotencyKey, scope))) new DuplicateRequest();
 
     try {
-      const result = await operation();
-      await this.idempotencyService.complete(payload.idempotencyKey, scope, result as unknown as Record<string, any>);
-      return result;
+      return await operation();
     } catch (error) {
       await this.idempotencyService.release(payload.idempotencyKey, scope);
       throw error;

@@ -1,52 +1,47 @@
 import { Injectable } from '@nestjs/common';
-import { createHash } from 'node:crypto';
-import { LessThan, Repository } from 'typeorm';
-import { InjectRepository } from '@nestjs/typeorm';
-import { IdempotencyStatus } from '@utils/enum';
-import { IdempotencyKey } from './entities/idempotency.entity';
+import { RedisService } from '@cache/redis.service';
 
-const TTL_HOURS = 24;
+/** How long a key stays reserved. A retry after this window is a new transaction. */
+const TTL_SECONDS = +(process.env.IDEMPOTENCY_TTL || 86400);
 
+/**
+ * Idempotency keys live in Redis, not Postgres.
+ *
+ * Every money movement carries a key. The first request to present it wins the
+ * `SET NX` and owns the transaction; anyone presenting the same key again is
+ * rejected outright — the operation is not replayed, because the caller already
+ * has (or can read) the transaction the first request produced.
+ *
+ * Redis is the right store here: the claim is short-lived, checked on the hot
+ * path, and must not cost a write to the ledger database.
+ */
 @Injectable()
 export class IdempotencyService {
-  constructor(@InjectRepository(IdempotencyKey) private readonly repository: Repository<IdempotencyKey>) {}
+  constructor(private readonly redis: RedisService) {}
 
-  static hash(payload: unknown): string {
-    return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  private static redisKey(scope: string, key: string): string {
+    return `idempotency:${scope}:${key}`;
   }
 
   /**
-   * Claims a key for this request.
-   *
-   * Returns the stored response when the same key + body already completed
-   * (replay), or `null` when the caller now owns the operation. The unique
-   * index on `key` is what makes the claim race-safe: a concurrent duplicate
-   * loses the insert and is read back instead.
+   * Reserves the key for this request. `false` means it was already taken and
+   * the caller must reject the transaction.
    */
-  async claim(key: string, scope: string, payload: unknown): Promise<{ replay: Record<string, any> } | null> {
-    const requestHash = IdempotencyService.hash(payload);
-    const existing = await this.repository.findOne({ where: { key, scope } });
-
-    if (existing) {
-      return { replay: existing.status === IdempotencyStatus.COMPLETED ? existing.response : null };
-    }
-
-    const expiresAt = new Date(Date.now() + TTL_HOURS * 60 * 60 * 1000);
-    await this.repository.insert({ key, scope, requestHash, expiresAt, status: IdempotencyStatus.IN_PROGRESS });
-    return null;
+  async claim(key: string, scope: string): Promise<boolean> {
+    return this.redis.setIfAbsent(IdempotencyService.redisKey(scope, key), { claimedAt: new Date().toISOString() }, TTL_SECONDS);
   }
 
-  /** Stores the response so a later retry of the same key replays it. */
-  async complete(key: string, scope: string, response: Record<string, any>): Promise<void> {
-    await this.repository.update({ key, scope }, { status: IdempotencyStatus.COMPLETED, response });
-  }
-
-  /** Drops the claim so a failed operation can be retried cleanly. */
+  /**
+   * Releases a claim whose operation never completed.
+   *
+   * A failed transaction did not move money, so holding its key would block a
+   * legitimate retry. Only successful operations keep the reservation.
+   */
   async release(key: string, scope: string): Promise<void> {
-    await this.repository.delete({ key, scope });
+    await this.redis.del(IdempotencyService.redisKey(scope, key));
   }
 
-  async purgeExpired(): Promise<void> {
-    await this.repository.delete({ expiresAt: LessThan(new Date()) });
+  async isClaimed(key: string, scope: string): Promise<boolean> {
+    return this.redis.exists(IdempotencyService.redisKey(scope, key));
   }
 }

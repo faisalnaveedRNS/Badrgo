@@ -34,11 +34,6 @@ export enum OutboxStatus {
   FAILED = 'failed',
 }
 
-export enum IdempotencyStatus {
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-}
-
 export enum ReportType {
   WALLET_BALANCE = 'wallet_balance',
   TRANSACTION_HISTORY = 'transaction_history',
@@ -168,7 +163,7 @@ export enum ResponseMessage {
   INSUFFICIENT_BALANCE = 'Insufficient balance',
   INVALID_AMOUNT = 'Amount must be greater than zero',
   CURRENCY_MISMATCH = 'Currency does not match the wallet currency',
-  DUPLICATE_REQUEST = 'A request with this idempotency key is already in progress',
+  DUPLICATE_REQUEST = 'A transaction with this idempotency key has already been accepted',
 
   // Transaction
   TRANSACTION_NOT_FOUND = 'Transaction not found',

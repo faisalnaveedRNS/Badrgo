@@ -41,6 +41,19 @@ export class RedisService implements OnApplicationShutdown {
   }
 
   /**
+   * Sets a key only if it does not already exist, returning whether this caller
+   * won. `SET NX` is a single round trip and atomic, so two concurrent callers
+   * can never both win — which is what makes it safe as an idempotency claim.
+   */
+  async setIfAbsent(key: string, value: unknown, ttlSeconds: number): Promise<boolean> {
+    return (await this.client.set(key, JSON.stringify(value), 'EX', ttlSeconds, 'NX')) === 'OK';
+  }
+
+  async exists(key: string): Promise<boolean> {
+    return (await this.client.exists(key)) === 1;
+  }
+
+  /**
    * Increments a counter and returns its value, setting the window TTL on the
    * first hit. Backs the rate limit guard.
    */

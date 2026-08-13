@@ -4,9 +4,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommonModule } from '@common/common.module';
 import { KafkaModule } from '@kafka/kafka.module';
+import { RedisModule } from '@cache/redis.module';
 import { AppConfig } from '@utils/config';
 import { LoggerModule } from '@utils/logger/logger.module';
-import { IdempotencyKey } from './modules/idempotency/entities/idempotency.entity';
 import { IdempotencyModule } from './modules/idempotency/idempotency.module';
 import { OutboxEvent } from './modules/outbox/entities/outbox.entity';
 import { OutboxModule } from './modules/outbox/outbox.module';
@@ -16,7 +16,7 @@ import { Wallet } from './modules/wallet/entities/wallet.entity';
 import { WalletModule } from './modules/wallet/wallet.module';
 
 /** Tables owned by the wallet service. No other service reads them. */
-export const entities = [Wallet, Transaction, OutboxEvent, IdempotencyKey];
+export const entities = [Wallet, Transaction, OutboxEvent];
 
 @Module({
   imports: [
@@ -26,6 +26,7 @@ export const entities = [Wallet, Transaction, OutboxEvent, IdempotencyKey];
     LoggerModule,
     CommonModule,
     KafkaModule,
+    RedisModule,
     WalletModule,
     TransactionModule,
     OutboxModule,
