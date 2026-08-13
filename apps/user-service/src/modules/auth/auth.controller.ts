@@ -7,7 +7,7 @@ import { ResponseCode, ResponseMessage } from '@utils/enum';
 import { InvalidCredentials } from './auth.exception';
 import { LoginResponse } from './auth.response';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './common/auth.dto';
+import { LoginDto, RegisterDto } from '@contracts/auth.dto';
 
 @ApiTags('Auth')
 @Controller('auth')

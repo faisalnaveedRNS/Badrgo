@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { TokenExpiredError } from 'jsonwebtoken';
+import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 import { ROLES_KEY } from '@common/decorator/role.decorator';
 import { ResponseMessage, UserRoles } from '@utils/enum';
 import { AuthToken } from '@utils/jwt';
@@ -31,6 +31,11 @@ export class AuthGuard implements CanActivate {
       return true;
     } catch (error) {
       if (error instanceof TokenExpiredError) throw new UnauthorizedException(ResponseMessage.TOKEN_EXPIRED);
+
+      // A tampered or malformed token is the caller's problem, not a server
+      // fault — without this it escapes as an unhandled error and reports 500.
+      if (error instanceof JsonWebTokenError) throw new UnauthorizedException(ResponseMessage.INVALID_TOKEN);
+
       throw error;
     }
   }
