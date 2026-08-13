@@ -8,4 +8,4 @@ import { CreateWalletDto, WalletOperationDto } from '@contracts/wallet.dto';
  */
 export class CreateWalletBodyDto extends OmitType(CreateWalletDto, ['userId'] as const) {}
 
-export class WalletOperationBodyDto extends OmitType(WalletOperationDto, ['walletId'] as const) {}
+export class WalletOperationBodyDto extends OmitType(WalletOperationDto, ['walletId', 'userId'] as const) {}

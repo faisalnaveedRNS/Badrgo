@@ -21,6 +21,15 @@ export class WalletOperationDto {
   @IsUUID('4', { message: ResponseMessage.INVALID_PATH_PARAM })
   walletId: string;
 
+  /**
+   * Owner of the wallet, taken from the bearer token by the gateway — never
+   * from the request body. The wallet service refuses to move money unless it
+   * matches the wallet's `userId`.
+   */
+  @ApiProperty({ example: '5a9d8056-fffd-49a7-b215-40df44873d7d' })
+  @IsUUID('4', { message: ResponseMessage.INVALID_PATH_PARAM })
+  userId: string;
+
   /** Decimal string, never a float: `numeric(20,8)` all the way down. */
   @ApiProperty({ example: '250.00' })
   @IsNumberString({ no_symbols: false }, { message: ResponseMessage.INVALID_AMOUNT })
