@@ -1,6 +1,6 @@
 import { HttpStatus, INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { ResponseCode, ResponseMessage } from '@utils/enum';
+import { ResponseCode, ResponseMessage, UserRoles } from '@utils/enum';
 import { AppHelper, createTestApp, TEST_USER } from '../app.helper';
 
 let app: INestApplication;
@@ -57,5 +57,21 @@ describe('POST /auth/login', () => {
 
     expect(response.statusCode).toBe(HttpStatus.BAD_REQUEST);
     expect(response.body.statusCode).toBe(ResponseCode.INVALID_CREDENTIALS);
+  });
+
+  it('answers an unknown email exactly as a wrong password', async () => {
+    const unknown = await helper.loginUser('nobody@example.com', 'Passw0rd!');
+    const wrong = await helper.loginUser(TEST_USER.email, 'Wrong@12345');
+
+    expect(unknown.body).toEqual(wrong.body);
+  });
+
+  it('issues a token carrying the user id and role', async () => {
+    const response = await helper.loginUser(TEST_USER.email, TEST_USER.password);
+    const payload = JSON.parse(Buffer.from(response.body.token.split('.')[1], 'base64').toString());
+
+    expect(payload.user.id).toBe(response.body.user.id);
+    expect(payload.user.role).toBe(UserRoles.USER);
+    expect(payload.exp).toBeGreaterThan(payload.iat);
   });
 });
