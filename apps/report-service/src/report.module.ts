@@ -1,16 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClickhouseModule } from '@analytics/clickhouse.module';
 import { CommonModule } from '@common/common.module';
 import { AppConfig } from '@utils/config';
 import { LoggerModule } from '@utils/logger/logger.module';
 import { Report } from './modules/report/entities/report.entity';
-import { WalletProjection } from './modules/report/entities/wallet-projection.entity';
 import { ReportModule } from './modules/report/report.module';
 import { ReportView } from './modules/report/views/report.view';
 
-/** Tables owned by the report service: its own read models, nothing shared. */
-export const entities = [Report, WalletProjection, ReportView];
+/**
+ * Postgres holds the reports themselves. The event-derived read model lives in
+ * ClickHouse, which subscribes to Kafka directly — this service has no consumer.
+ */
+export const entities = [Report, ReportView];
 
 @Module({
   imports: [
@@ -18,6 +21,7 @@ export const entities = [Report, WalletProjection, ReportView];
     TypeOrmModule.forRoot(AppConfig.typeorm(process.env.REPORT_DB_DATABASE || 'badrgo_report', entities)),
     LoggerModule,
     CommonModule,
+    ClickhouseModule,
     ReportModule,
   ],
 })

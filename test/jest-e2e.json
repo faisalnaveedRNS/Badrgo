@@ -14,6 +14,7 @@
     "./test/jest.setup.ts"
   ],
   "moduleNameMapper": {
+    "^@analytics/(.*)$": "<rootDir>/libs/clickhouse/src/$1",
     "^@contracts/(.*)$": "<rootDir>/libs/common/src/contracts/$1",
     "^@common/(.*)$": "<rootDir>/libs/common/src/common/$1",
     "^@utils/(.*)$": "<rootDir>/libs/common/src/utils/$1",
