@@ -209,19 +209,30 @@ is how the report service does it.
 Money moves through exactly one method (`WalletService.post`), under a pessimistic
 row lock, with amounts held as `numeric(20,8)` strings end to end.
 
-### 8. Idempotency
+### 8. Idempotency (Redis)
 
-Retryable money operations take an `idempotencyKey`. The first request claims it,
-the retry replays the stored response instead of posting twice:
+Every money movement requires an `idempotencyKey`. The key is reserved in Redis
+with a single atomic `SET NX` before anything moves; a key that is already held
+means the transaction was already accepted, so the duplicate is **rejected**:
 
 ```bash
-POST /v1/api/wallet/:id/credit   { "amount": "25.00", "idempotencyKey": "abc" }  # posts
-POST /v1/api/wallet/:id/credit   { "amount": "25.00", "idempotencyKey": "abc" }  # replays
+POST /v1/api/wallet/:id/credit  { "amount": "250.00", …, "idempotencyKey": "abc" }
+# -> 200  transaction posted
+
+POST /v1/api/wallet/:id/credit  { "amount": "250.00", …, "idempotencyKey": "abc" }
+# -> { "statusCode": 666, "message": "A transaction with this idempotency key has already been accepted" }
 ```
 
-A failed operation releases its claim so the caller can retry cleanly. Without a
-key, the unique `reference` on the ledger line is the only guard against a double
-post.
+The claim lives in Redis rather than Postgres: it is short-lived, sits on the hot
+path of every transaction, and should not cost a write to the ledger database.
+`SET NX` is atomic, so two concurrent requests carrying the same key can never
+both win.
+
+A **failed** operation releases its key — nothing was posted, so the caller is
+entitled to retry with the same key. Successful ones hold the reservation for
+`IDEMPOTENCY_TTL` (24h by default); after that the key is free again and a
+request carrying it is a new transaction. The unique `reference` on the ledger
+line is the second line of defence.
 
 ## Adding a feature module
 

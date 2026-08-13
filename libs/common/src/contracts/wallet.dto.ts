@@ -37,12 +37,15 @@ export class WalletOperationDto {
   @Length(1, 128)
   reference: string;
 
-  /** Retrying with the same key replays the first response instead of moving money again. */
-  @ApiPropertyOptional({ example: 'b6e1f0c2-1f3e-4d5a-9f8b-2c7d1e4a6b90' })
-  @IsOptional()
+  /**
+   * Required on every money movement. Reserved in Redis for the first request
+   * that presents it; a repeat of the same key is rejected, not replayed.
+   */
+  @ApiProperty({ example: 'b6e1f0c2-1f3e-4d5a-9f8b-2c7d1e4a6b90' })
+  @IsNotEmpty()
   @IsString()
   @Length(1, 128)
-  idempotencyKey?: string;
+  idempotencyKey: string;
 
   @ApiPropertyOptional({ example: { channel: 'topup' } })
   @IsOptional()

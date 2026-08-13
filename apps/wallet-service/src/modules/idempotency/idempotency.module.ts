@@ -1,10 +1,8 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { IdempotencyKey } from './entities/idempotency.entity';
 import { IdempotencyService } from './idempotency.service';
 
+/** No TypeORM feature here: the claim store is Redis (see `RedisModule`). */
 @Module({
-  imports: [TypeOrmModule.forFeature([IdempotencyKey])],
   providers: [IdempotencyService],
   exports: [IdempotencyService],
 })
