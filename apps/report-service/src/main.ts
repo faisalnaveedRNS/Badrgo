@@ -5,14 +5,13 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
-import { KafkaConsumerGroup, kafkaConsumerOptions } from '@kafka/index';
 import { AppConfig } from '@utils/config';
 import { LoggerService } from '@utils/logger/logger.service';
 import { ReportServiceModule } from './report.module';
 
 /**
- * Hybrid app with three faces: HTTP for probes only, TCP for the gateway's
- * queries, and Kafka for the event stream that builds the projection.
+ * TCP for the gateway's queries, HTTP for probes. No Kafka listener: ClickHouse
+ * subscribes to the topics itself and this service just reads the result.
  */
 const bootstrap = async () => {
   const app = await NestFactory.create<NestExpressApplication>(ReportServiceModule, { bufferLogs: true });
@@ -27,7 +26,6 @@ const bootstrap = async () => {
     transport: Transport.TCP,
     options: { host: process.env.REPORT_SERVICE_HOST || '0.0.0.0', port: +(process.env.REPORT_SERVICE_PORT || 4003) },
   });
-  app.connectMicroservice<MicroserviceOptions>(kafkaConsumerOptions('report-service', KafkaConsumerGroup.REPORTS));
 
   await app.startAllMicroservices();
   await app.listen(process.env.REPORT_HTTP_PORT || 3003);
@@ -35,9 +33,7 @@ const bootstrap = async () => {
 };
 
 bootstrap()
-  .then(() =>
-    console.log(`Report service: TCP ${process.env.REPORT_SERVICE_PORT || 4003}, Kafka group ${KafkaConsumerGroup.REPORTS}, probes on ${process.env.REPORT_HTTP_PORT || 3003}`),
-  )
+  .then(() => console.log(`Report service: TCP ${process.env.REPORT_SERVICE_PORT || 4003}, probes on ${process.env.REPORT_HTTP_PORT || 3003}`))
   .catch((err) => {
     console.error(err);
     process.exit(1);

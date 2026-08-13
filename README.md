@@ -21,15 +21,22 @@ A NestJS microservice platform: an API gateway fronting user, wallet and report 
                     wallet · transaction│
                     outbox · idempotency│
                              │          │
-                          outbox        │
+                          outbox        │ reads
                              ▼          │
                         ┌─────────┐     │
-                        │  Kafka  │─────┘
-                        │ wallet.*│  reports · (audit) · (analytics)
-                        │ tx.*    │
-                        └─────────┘
+                        │  Kafka  │     │
+                        │ wallet.*│     │
+                        │ tx.*    │     │
+                        └────┬────┘     │
+                             │ Kafka engine table
+                             ▼          │
+                        ┌─────────────────┐
+                        │   ClickHouse    │
+                        │ wallet_events   │
+                        │ balance view    │
+                        └─────────────────┘
 
-                     Redis: cache · rate limit · fast lookup
+                     Redis: cache · rate limit · idempotency
 ```
 
 Each service owns its database and no other service reads it. Synchronous
@@ -37,20 +44,25 @@ request/response goes over Nest's TCP transport; anything that fans out goes to
 Kafka, written first to the producing service's outbox so state and event commit
 together.
 
+**Nothing in the application consumes Kafka.** ClickHouse subscribes to the
+topics itself through a Kafka engine table and materializes the rows on arrival,
+so the analytics store stays current without a consumer to deploy, scale or
+restart.
+
 ## Stack
 
-NestJS 11 · TypeORM 1 (Postgres 16) · Kafka (KRaft) · Redis 7 · JWT auth · nestjs-i18n · Swagger · Jest + Supertest
+NestJS 11 · TypeORM 1 (Postgres 16) · Kafka (KRaft) · ClickHouse 24 · Redis 7 · JWT auth · nestjs-i18n · Swagger · Jest + Supertest
 
 ## Getting started
 
 ```bash
 cp .env.example .env                 # then set JWT_SECRET_KEY
-docker compose up -d                 # postgres + redis + kafka
+docker compose up -d                 # postgres + redis + kafka + clickhouse
 npm install
 
 npm run start:user                   # HTTP 3001 · TCP 4001
 npm run start:wallet                 # TCP 4002
-npm run start:report                 # HTTP 3003 (probes) · TCP 4003 · Kafka consumer
+npm run start:report                 # HTTP 3003 (probes) · TCP 4003
 npm run start:gateway                # HTTP 3000
 ```
 
@@ -80,15 +92,16 @@ apps/
     modules/{wallet,transaction,outbox,idempotency}
       wallet/views/       wallet_view      (ledger totals + balance drift)
       transaction/views/  transaction_view (signed amounts, owning user)
-  report-service/   TCP queries + Kafka consumer building a read model
-    modules/{report,consumer}
+  report-service/   TCP queries only — ClickHouse does the consuming
+    modules/{report}
       report/views/     report_view      (headline numbers lifted out of JSON)
 libs/
   common/           response envelope, Exception layer, base entity, DTOs,
                     decorators, guards, filters (HTTP + RPC), i18n, config, utils
   common/contracts/ message patterns + DTOs shared by gateway and services
   kafka/            topics, event envelope, producer, consumer config
-  redis/            cache/fast lookup service + rate limit guard & decorator
+  redis/            cache service + idempotency store + rate limit guard
+  clickhouse/       read-only client for the analytics store (`@analytics/*`)
 test/               e2e harness + specs (run against the user service)
 ```
 
@@ -279,6 +292,75 @@ Changing a view's SQL is a schema change: `synchronize` drops and recreates it o
 boot. Under migrations, that becomes an explicit `DROP VIEW` / `CREATE VIEW` pair —
 and views must be dropped before the tables they depend on.
 
+### 10. ClickHouse consumes Kafka, not the application
+
+There is no `@EventPattern` handler anywhere. ClickHouse is the subscriber, wired
+in `docker/clickhouse-init.sql`:
+
+```
+wallet.* / tx.*  ->  kafka_wallet_events   Kafka engine table (the consumer)
+                 ->  wallet_events_mv      materialized view, parses the JSON
+                 ->  wallet_events         ReplacingMergeTree, deduped
+                 ->  wallet_balance_view   per-wallet aggregate
+                 ->  wallet_report_view    the finished report, one row
+```
+
+**ClickHouse aggregates; the report service only stores the answer.** No total is
+summed in application code — `wallet_report_view` is a parameterized view that
+returns a single already-aggregated row:
+
+```ts
+const [summary] = await this.clickhouse.query<WalletSummaryRow>(
+  `SELECT * FROM wallet_report_view(userId = {userId:String})`,
+  { userId },
+);
+report.result = { wallets: Number(summary.wallets), totalBalance: summary.total_balance, ... };
+```
+
+Money stays `Decimal(38,8)` in the view; the client sets
+`output_format_decimal_trailing_zeros` and `output_format_json_quote_decimals` so
+it arrives as `"879.50000000"` — a string, never a JS float.
+
+The engine table reads with `kafka_format = 'JSONAsString'`, so the whole message
+lands in one column and parsing happens in the materialized view. A new field in
+an event payload cannot break ingestion — it is simply not extracted yet.
+
+**Redelivery is handled by the storage engine.** `wallet_events` is a
+`ReplacingMergeTree` ordered by `(wallet_id, occurred_at, event_id)`, and
+`wallet_balance_view` reads `FROM wallet_events FINAL`, so a duplicate delivery
+collapses instead of double-counting a credit. This replaces the
+`lastEventId` check the old application projection did by hand.
+
+Only `wallet.*` events are summed in the balance view: `tx.posted` describes the
+same movement and would count every amount twice.
+
+The application side is read-only — [`ClickhouseService`](libs/clickhouse/src/clickhouse.service.ts)
+exposes `query()` with bound parameters and nothing else:
+
+```ts
+await this.clickhouse.query<WalletBalanceRow>(
+  `SELECT ... FROM wallet_balance_view WHERE user_id = {userId:String}`,
+  { userId },
+);
+```
+
+Note the alias is `@analytics/*`, not `@clickhouse/*` — the latter would shadow
+the `@clickhouse/client` package.
+
+Trade-offs worth knowing:
+
+- Ingestion is **eventually consistent**. The engine table flushes on batch size
+  or timeout, so a report requested immediately after a credit may not include it.
+- The Kafka engine table can only be read once per consumer group; **do not
+  `SELECT` from `kafka_wallet_events` directly** — that steals messages from the
+  materialized view.
+- `FINAL` deduplicates at query time and costs more than a plain scan. At larger
+  volumes, replace the view with an `AggregatingMergeTree` rollup.
+- Changing the schema means editing `docker/clickhouse-init.sql`, which only runs
+  on a **fresh** volume; an existing deployment needs the DDL applied by hand.
+  Note the file uses `CREATE VIEW IF NOT EXISTS` — re-running it will **not**
+  update a view that already exists. Drop it first, or use `CREATE OR REPLACE`.
+
 ## Adding a feature module
 
 1. Decide who owns it. New bounded context → a new app under `apps/`; behaviour on
@@ -291,13 +373,15 @@ and views must be dropped before the tables they depend on.
    payload DTO to `@contracts/`, an RPC controller in the service, and an HTTP
    controller + response classes in the gateway.
 6. If it emits events: add the topic to `@kafka/kafka.topics`, record to the outbox
-   inside the transaction, and make the consumer idempotent.
+   inside the transaction, and add the topic to `kafka_topic_list` in
+   `docker/clickhouse-init.sql` if it should reach analytics.
 7. Register the module in `imports` (client) or `adminModulesImports` (admin).
 8. Add `test/<feature>/<feature>.e2e.spec.ts`.
 
 ## Not built yet
 
 Deliberately left for the next pass: gateway proxying of auth/user endpoints (the
-user service still serves its own HTTP surface), the audit and analytics consumers
-(their consumer groups are already defined in `@kafka/kafka.topics`), migrations in
-place of `DB_SYNC`, and e2e coverage for the wallet and report services.
+user service still serves its own HTTP surface), an audit trail (ClickHouse now
+covers analytics, but nothing writes an immutable audit log), migrations in place
+of `DB_SYNC` and of the ClickHouse init script, and e2e coverage for the wallet
+and report services.

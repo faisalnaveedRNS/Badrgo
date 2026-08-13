@@ -24,6 +24,7 @@
       "@contracts/*": ["libs/common/src/contracts/*"],
       "@kafka/*": ["libs/kafka/src/*"],
       "@cache/*": ["libs/redis/src/*"],
+      "@analytics/*": ["libs/clickhouse/src/*"],
       "@modules/*": ["apps/user-service/src/modules/*"],
       "@gateway/*": ["apps/gateway/src/*"],
       "@wallet/*": ["apps/wallet-service/src/*"],
