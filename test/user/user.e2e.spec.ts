@@ -1,6 +1,6 @@
 import { HttpStatus, INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { ResponseCode } from '../../src/utils/enum';
+import { ResponseCode } from '@utils/enum';
 import { AppHelper, createTestApp, TEST_USER } from '../app.helper';
 
 let app: INestApplication;

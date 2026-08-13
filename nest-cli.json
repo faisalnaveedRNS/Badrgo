@@ -1,10 +1,21 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
-  "language": "ts",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "src",
+  "sourceRoot": "apps/user-service/src",
+  "monorepo": true,
+  "root": "apps/user-service",
   "compilerOptions": {
-    "plugins": ["@nestjs/swagger"],
-    "deleteOutDir": true
+    "webpack": false,
+    "tsConfigPath": "tsconfig.json",
+    "plugins": ["@nestjs/swagger"]
+  },
+  "projects": {
+    "gateway": { "type": "application", "root": "apps/gateway", "entryFile": "main", "sourceRoot": "apps/gateway/src" },
+    "user-service": { "type": "application", "root": "apps/user-service", "entryFile": "main", "sourceRoot": "apps/user-service/src" },
+    "wallet-service": { "type": "application", "root": "apps/wallet-service", "entryFile": "main", "sourceRoot": "apps/wallet-service/src" },
+    "report-service": { "type": "application", "root": "apps/report-service", "entryFile": "main", "sourceRoot": "apps/report-service/src" },
+    "common": { "type": "library", "root": "libs/common", "entryFile": "index", "sourceRoot": "libs/common/src", "compilerOptions": { "tsConfigPath": "tsconfig.json" } },
+    "kafka": { "type": "library", "root": "libs/kafka", "entryFile": "index", "sourceRoot": "libs/kafka/src", "compilerOptions": { "tsConfigPath": "tsconfig.json" } },
+    "redis": { "type": "library", "root": "libs/redis", "entryFile": "index", "sourceRoot": "libs/redis/src", "compilerOptions": { "tsConfigPath": "tsconfig.json" } }
   }
 }

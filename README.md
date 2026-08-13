@@ -1,58 +1,100 @@
 # Badrgo
 
-A runnable NestJS starter distilled from the conventions of this repository: a split admin/user API surface, localization, a single exception layer, a uniform response envelope, and an end-to-end test harness. No business/domain code — everything here is scaffolding you extend.
+A NestJS microservice platform: an API gateway fronting user, wallet and report services, wired together with TCP for synchronous calls and Kafka for domain events. It keeps the conventions of the original single-app blueprint — split admin/user surfaces, localization, one exception layer, a uniform response envelope, an e2e harness — and adds the money-movement pieces: a transactional outbox, idempotency keys, and a read-model projection.
+
+## Architecture
+
+```
+                    Next.js Operations UI
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   API Gateway   │  auth · rate limit · cache · Swagger
+                    └────────┬────────┘
+              TCP  ┌─────────┼─────────┐  TCP
+                   ▼         ▼         ▼
+              ┌────────┐ ┌────────┐ ┌────────┐
+              │  User  │ │ Wallet │ │ Report │
+              └────────┘ └───┬────┘ └───▲────┘
+                             │          │
+                        Postgres        │
+                    wallet · transaction│
+                    outbox · idempotency│
+                             │          │
+                          outbox        │
+                             ▼          │
+                        ┌─────────┐     │
+                        │  Kafka  │─────┘
+                        │ wallet.*│  reports · (audit) · (analytics)
+                        │ tx.*    │
+                        └─────────┘
+
+                     Redis: cache · rate limit · fast lookup
+```
+
+Each service owns its database and no other service reads it. Synchronous
+request/response goes over Nest's TCP transport; anything that fans out goes to
+Kafka, written first to the producing service's outbox so state and event commit
+together.
 
 ## Stack
 
-NestJS 10 · TypeORM (Postgres) · JWT auth · nestjs-i18n · Swagger · Jest + Supertest
+NestJS 11 · TypeORM 1 (Postgres 16) · Kafka (KRaft) · Redis 7 · JWT auth · nestjs-i18n · Swagger · Jest + Supertest
 
 ## Getting started
 
 ```bash
-cp .env.example .env          # then set DB credentials + JWT_SECRET_KEY
-createdb badrgo
+cp .env.example .env                 # then set JWT_SECRET_KEY
+docker compose up -d                 # postgres + redis + kafka
 npm install
-npm run start:dev
+
+npm run start:user                   # HTTP 3001 · TCP 4001
+npm run start:wallet                 # TCP 4002
+npm run start:report                 # HTTP 3003 (probes) · TCP 4003 · Kafka consumer
+npm run start:gateway                # HTTP 3000
 ```
 
-`docker compose up -d postgres` starts a Postgres 16 instance instead of a local install
-(it reads `DB_USERNAME` / `DB_PASSWORD` / `DB_DATABASE` / `DB_PORT` from `.env`). The
-`Dockerfile` builds the API image itself for deployment.
+Compose creates the per-service databases on first boot (`docker/postgres-init.sh`).
+Kafka is reachable on `localhost:29092` from the host and `kafka:9092` inside the network.
 
 - Client API docs: <http://localhost:3000/docs>
 - Admin API docs: <http://localhost:3000/docs/admin>
 - Global route prefix: `v1/api`
+- Health: `/v1/api/health` (gateway), `/health/ready` (services, checks the database)
 
-On first boot the seeder creates the three roles and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`.
+On first boot the user service seeds the three roles and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`.
 
 ## Layout
 
 ```
-src/
-  main.ts                      bootstrap: pipes → filter → prefix → two Swagger docs
-  response/response.ts         base envelope every success response extends
-  models/models.ts             shared types (JWT payload, query filters)
-  i18n/{en-us,ur}/common.json  translation catalogues
-  modules/
-    main/                      AppModule + AppService (typeorm/env/startup config)
-    common/                    base entity, decorators, DTOs, filter, pipes, responses, validators
-    auth/                      user-side register/login + AuthGuard (roles)
-    user/                      user self-service (profile, password)
-    role/                      role entity + lookup
-    language/                  i18n reference module
-    admin/
-      admin/                   admin entity + service
-      auth/                    admin login, admin creation (super admin only)
-      user/                    admin-side user management (list/inspect/block/delete)
-  utils/                       enum (codes + messages), helper (Exception, pagination), jwt, hash, logger, seeder
-test/                          e2e harness + specs per module
+apps/
+  gateway/          the only public process — no database of its own
+    modules/client/   TCP clients + `send()` (error translation, timeouts)
+    modules/wallet/   HTTP surface over the wallet service
+    modules/report/   admin HTTP surface over the report service
+  user-service/     hybrid: keeps its HTTP surface, adds a TCP face
+    modules/{auth,user,role,admin,language,seeder,main}
+  wallet-service/   pure TCP microservice, produces to Kafka via the outbox
+    modules/{wallet,transaction,outbox,idempotency}
+  report-service/   TCP queries + Kafka consumer building a read model
+    modules/{report,consumer}
+libs/
+  common/           response envelope, Exception layer, base entity, DTOs,
+                    decorators, guards, filters (HTTP + RPC), i18n, config, utils
+  common/contracts/ message patterns + DTOs shared by gateway and services
+  kafka/            topics, event envelope, producer, consumer config
+  redis/            cache/fast lookup service + rate limit guard & decorator
+test/               e2e harness + specs (run against the user service)
 ```
 
-## The five conventions
+Path aliases: `@common/*` `@utils/*` `@contracts/*` `@models` `@response` (libs/common),
+`@kafka/*` `@cache/*` (libs), `@modules/*` `@gateway/*` `@wallet/*` `@report/*` (apps).
+
+## The conventions
 
 ### 1. Admin and user sides are separate surfaces
 
-`app.module.ts` exports two arrays — `imports` (client) and `adminModulesImports` (back office). `main.ts` feeds each into its own Swagger document, so `/docs` and `/docs/admin` never leak one another's endpoints. Admin controllers live under `modules/admin/*` and are routed under `admin/…`.
+Each HTTP app (`gateway.module.ts`, `app.module.ts`) exports two arrays — `imports` (client) and `adminModulesImports` (back office). `main.ts` feeds each into its own Swagger document, so `/docs` and `/docs/admin` never leak one another's endpoints. Admin controllers live under `modules/admin/*` (or `modules/report/` in the gateway) and are routed under `admin/…`.
 
 Both sides share one `AuthGuard` and one set of services; what differs is the controller and the required role:
 
@@ -62,7 +104,7 @@ Both sides share one `AuthGuard` and one set of services; what differs is the co
 @Controller('admin/user')
 ```
 
-To add a module: create it under `modules/`, register it in `imports` **or** `adminModulesImports`.
+To add a module: create it under the app's `modules/`, register it in `imports` **or** `adminModulesImports`.
 
 ### 2. Response pattern
 
@@ -105,7 +147,7 @@ New error → add a `ResponseCode` + `ResponseMessage` pair, then a class in the
 
 ### 4. Language (i18n)
 
-`I18nModule` resolves the language from `?lang=` then `Accept-Language`, falling back to `FALLBACK_LANGUAGE`. Catalogues live in `src/i18n/<locale>/<namespace>.json` and are copied into `dist` by `npm run build`.
+`I18nModule` resolves the language from `?lang=` then `Accept-Language`, falling back to `FALLBACK_LANGUAGE`. Catalogues live in `libs/common/src/i18n/<locale>/<namespace>.json` and are copied into `dist` by `npm run build`.
 
 ```bash
 curl 'localhost:3000/v1/api/language/welcome?name=Ali&lang=ur'
@@ -115,19 +157,89 @@ curl 'localhost:3000/v1/api/language/welcome?name=Ali&lang=ur'
 
 ### 5. Tests
 
-`test/app.helper.ts` boots the **real** `AppModule` with the same pipes and filter as `main.ts`, so specs exercise production behaviour rather than a stub. `Helper.truncateAll()` gives each suite a clean database, and `helper.init()` seeds roles + super admin and logs in one user and one admin.
+`test/app.helper.ts` boots the **real** user-service `AppModule` with the same pipes and filter as `main.ts`, so specs exercise production behaviour rather than a stub. `Helper.truncateAll()` gives each suite a clean database, and `helper.init()` seeds roles + super admin and logs in one user and one admin.
 
 ```bash
-createdb badrgo_test          # matches _test.env
+createdb badrgo_test             # matches _test.env
 npm test                         # e2e suites, serial
 npm run test:cov
 ```
 
 Specs are grouped per module (`test/<module>/<name>.e2e.spec.ts`) and cover the happy path, the domain-error code, and the authorization boundary — mirror that trio when adding a module.
 
+### 6. Service boundaries
+
+The gateway never touches a database. It authenticates, rate limits, caches, and
+forwards:
+
+```ts
+const wallet = await send<WalletModel>(this.walletService, WalletPattern.CREATE, payload);
+```
+
+`send()` (`apps/gateway/src/modules/client/service.client.ts`) applies a timeout and
+translates the failure: a domain error keeps its application `statusCode`, an
+unreachable service becomes `SERVICE_UNAVAILABLE` (690) instead of a stack trace.
+
+Domain codes survive the hop because each RPC controller carries
+`@UseFilters(RpcAllExceptionsFilter)` — without it Nest flattens every error to
+"Internal server error". In a hybrid app, bind handlers to their transport
+(`@MessagePattern(p, Transport.TCP)`, `@EventPattern(t, Transport.KAFKA)`), or the
+Kafka consumer will subscribe to your TCP patterns as topics.
+
+Patterns and shared payload DTOs live in `libs/common/src/contracts/` so the two
+sides of a call cannot drift.
+
+### 7. Outbox, not dual write
+
+The balance update, the ledger line and the event are one database transaction:
+
+```ts
+return this.dataSource.transaction(async (manager) => {
+  const wallet = await manager.findOne(Wallet, { where: { id }, lock: { mode: 'pessimistic_write' } });
+  // … update wallet, insert transaction …
+  await this.outboxService.record(manager, KafkaTopic.WALLET_CREDITED, 'wallet', wallet.id, event);
+});
+```
+
+`OutboxPublisher` polls `outbox_events` every `OUTBOX_POLL_MS` and ships them to
+Kafka, retrying up to 10 attempts before marking a row FAILED. Delivery is
+**at-least-once**, so consumers dedupe on `eventId` — `WalletProjection.lastEventId`
+is how the report service does it.
+
+Money moves through exactly one method (`WalletService.post`), under a pessimistic
+row lock, with amounts held as `numeric(20,8)` strings end to end.
+
+### 8. Idempotency
+
+Retryable money operations take an `idempotencyKey`. The first request claims it,
+the retry replays the stored response instead of posting twice:
+
+```bash
+POST /v1/api/wallet/:id/credit   { "amount": "25.00", "idempotencyKey": "abc" }  # posts
+POST /v1/api/wallet/:id/credit   { "amount": "25.00", "idempotencyKey": "abc" }  # replays
+```
+
+A failed operation releases its claim so the caller can retry cleanly. Without a
+key, the unique `reference` on the ledger line is the only guard against a double
+post.
+
 ## Adding a feature module
 
-1. `modules/<feature>/` with `entities/`, `common/` (DTOs), `<feature>.{module,controller,service,exception,response}.ts`
-2. Add codes/messages to `@utils/enum`, error classes to `<feature>.exception.ts`
-3. Register in `imports` (client) or `adminModulesImports` (admin) in `app.module.ts`
-4. Add `test/<feature>/<feature>.e2e.spec.ts`
+1. Decide who owns it. New bounded context → a new app under `apps/`; behaviour on
+   existing data → a module inside that service.
+2. `modules/<feature>/` with `entities/`, `common/` (DTOs), `<feature>.{module,controller,service,exception,response}.ts`
+3. Add codes/messages to `@utils/enum`, error classes to `<feature>.exception.ts`
+4. If the gateway exposes it: add the pattern to `@contracts/patterns`, a shared
+   payload DTO to `@contracts/`, an RPC controller in the service, and an HTTP
+   controller + response classes in the gateway.
+5. If it emits events: add the topic to `@kafka/kafka.topics`, record to the outbox
+   inside the transaction, and make the consumer idempotent.
+6. Register the module in `imports` (client) or `adminModulesImports` (admin).
+7. Add `test/<feature>/<feature>.e2e.spec.ts`.
+
+## Not built yet
+
+Deliberately left for the next pass: gateway proxying of auth/user endpoints (the
+user service still serves its own HTTP surface), the audit and analytics consumers
+(their consumer groups are already defined in `@kafka/kafka.topics`), migrations in
+place of `DB_SYNC`, and e2e coverage for the wallet and report services.

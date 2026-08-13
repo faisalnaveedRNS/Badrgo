@@ -1,11 +1,11 @@
 import { HttpStatus, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { HttpExceptionFilter } from '../src/modules/common/filters/http-exception.filter';
-import { TrimStringsPipe } from '../src/modules/common/transformer/trim-strings.pipe';
-import { AppModule } from '../src/modules/main/app.module';
-import { LoggerService } from '../src/utils/logger/logger.service';
-import { SeedService } from '../src/utils/seeder/seeder.service';
+import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
+import { TrimStringsPipe } from '@common/transformer/trim-strings.pipe';
+import { AppModule } from '@modules/main/app.module';
+import { LoggerService } from '@utils/logger/logger.service';
+import { SeedService } from '@modules/seeder/seeder.service';
 import { Helper } from './abstract-helper';
 
 export const TEST_USER = { email: 'e2e.user@example.com', password: 'Passw0rd!' };

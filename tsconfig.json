@@ -14,15 +14,22 @@
     "target": "es2017",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./src",
+    "baseUrl": "./",
     "allowJs": true,
     "paths": {
-      "@models": ["models/models"],
-      "@response": ["response/response"],
-      "@modules/*": ["modules/*"],
-      "@utils/*": ["utils/*"]
+      "@models": ["libs/common/src/models/models"],
+      "@response": ["libs/common/src/response/response"],
+      "@common/*": ["libs/common/src/common/*"],
+      "@utils/*": ["libs/common/src/utils/*"],
+      "@contracts/*": ["libs/common/src/contracts/*"],
+      "@kafka/*": ["libs/kafka/src/*"],
+      "@cache/*": ["libs/redis/src/*"],
+      "@modules/*": ["apps/user-service/src/modules/*"],
+      "@gateway/*": ["apps/gateway/src/*"],
+      "@wallet/*": ["apps/wallet-service/src/*"],
+      "@report/*": ["apps/report-service/src/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["apps/**/*", "libs/**/*"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts"]
 }
