@@ -31,8 +31,8 @@ export class WalletController {
   }
 
   @MessagePattern(WalletPattern.FIND_BY_ID)
-  async findById(@Payload() payload: { id: string }): Promise<WalletView> {
-    return this.service.findById(payload.id);
+  async findById(@Payload() payload: { id: string; userId?: string }): Promise<WalletView> {
+    return this.service.findById(payload.id, payload.userId);
   }
 
   @MessagePattern(WalletPattern.FIND_BY_USER)
@@ -51,7 +51,11 @@ export class WalletController {
   }
 
   @MessagePattern(WalletPattern.TRANSACTIONS)
-  async transactions(@Payload() payload: { walletId: string; query: PaginationDto }) {
+  async transactions(@Payload() payload: { walletId: string; userId?: string; query: PaginationDto }) {
+    // Resolve the wallet first: an unknown id, or one owned by another user,
+    // must fail rather than return an empty ledger.
+    await this.service.findById(payload.walletId, payload.userId);
+
     return this.transactionService.findByWallet(payload.walletId, payload.query);
   }
 

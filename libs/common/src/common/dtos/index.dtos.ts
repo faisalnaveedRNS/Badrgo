@@ -6,21 +6,29 @@ import { ResponseMessage } from '@utils/enum';
 
 export const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&^_-]).{8,50}$/;
 
+/**
+ * Query params must carry an explicit `type` and a TypeScript annotation.
+ *
+ * `emitDecoratorMetadata` only records a precise `design:type` for annotated
+ * properties — `page = 1` reflects as `Object`, which Swagger renders as a JSON
+ * textarea instead of a number field, and swagger-ui then fails to serialise
+ * the request at all.
+ */
 export class PaginationDto {
-  @ApiPropertyOptional({ example: 1, default: 1 })
+  @ApiPropertyOptional({ type: Number, example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page = 1;
+  page: number = 1;
 
-  @ApiPropertyOptional({ example: 10, default: 10, maximum: 100 })
+  @ApiPropertyOptional({ type: Number, example: 10, default: 10, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
-  pageSize = 10;
+  pageSize: number = 10;
 
   @ApiPropertyOptional({ example: 'john' })
   @IsOptional()

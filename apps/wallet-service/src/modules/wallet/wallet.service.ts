@@ -48,10 +48,17 @@ export class WalletService {
   /**
    * Read path: the view, which carries the ledger totals alongside the balance.
    * The table is only touched on the write path, under a row lock.
+   *
+   * When `userId` is given the wallet must belong to that user. A wallet owned
+   * by someone else reports NOT FOUND rather than FORBIDDEN — telling a caller
+   * that an id exists but is not theirs is itself a leak.
    */
-  async findById(id: string): Promise<WalletView> {
+  async findById(id: string, userId?: string): Promise<WalletView> {
     const wallet = await this.walletView.findOne({ where: { id } });
+
     if (!wallet) new WalletNotFound();
+    if (userId && wallet.userId !== userId) new WalletNotFound();
+
     return wallet;
   }
 
@@ -82,6 +89,9 @@ export class WalletService {
       const wallet = await manager.findOne(Wallet, { where: { id: payload.walletId }, lock: { mode: 'pessimistic_write' } });
 
       if (!wallet) new WalletNotFound();
+      // Ownership is enforced here, not at the gateway: this is the only path
+      // that moves money, so it is the only place the check cannot be skipped.
+      if (wallet.userId !== payload.userId) new WalletNotFound();
       if (wallet.status !== EStatus.ACTIVE) new WalletInactive();
       if (wallet.currency !== payload.currency) new CurrencyMismatch();
 

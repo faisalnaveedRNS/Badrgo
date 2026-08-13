@@ -58,8 +58,8 @@ export class WalletController {
   @Get(':id')
   @ApiOperation({ summary: 'Get one wallet' })
   @ApiOkResponse({ description: ResponseMessage.SUCCESS, type: WalletResponse })
-  async findById(@Param() params: UuidParamDto, @Res({ passthrough: true }) res: ExpressResponse) {
-    const wallet = await send<WalletModel>(this.walletService, WalletPattern.FIND_BY_ID, { id: params.id });
+  async findById(@CurrentUser() currentUser: UserPayload, @Param() params: UuidParamDto, @Res({ passthrough: true }) res: ExpressResponse) {
+    const wallet = await send<WalletModel>(this.walletService, WalletPattern.FIND_BY_ID, { id: params.id, userId: currentUser.id });
 
     res.status(HttpStatus.OK);
     return new WalletResponse(wallet);
@@ -71,7 +71,7 @@ export class WalletController {
   @ApiCreatedResponse({ description: ResponseMessage.CREATED_SUCCESSFULLY, type: TransactionResponse })
   @ApiResponse({ status: ResponseCode.WALLET_NOT_FOUND, type: InvalidInput })
   async credit(@CurrentUser() currentUser: UserPayload, @Param() params: UuidParamDto, @Body() payload: WalletOperationBodyDto, @Res({ passthrough: true }) res: ExpressResponse) {
-    const transaction = await send<TransactionModel>(this.walletService, WalletPattern.CREDIT, { ...payload, walletId: params.id });
+    const transaction = await send<TransactionModel>(this.walletService, WalletPattern.CREDIT, { ...payload, walletId: params.id, userId: currentUser.id });
 
     await this.redis.del(`wallets:${currentUser.id}`);
     res.status(HttpStatus.CREATED);
@@ -83,7 +83,7 @@ export class WalletController {
   @ApiOperation({ summary: 'Debit a wallet' })
   @ApiCreatedResponse({ description: ResponseMessage.CREATED_SUCCESSFULLY, type: TransactionResponse })
   async debit(@CurrentUser() currentUser: UserPayload, @Param() params: UuidParamDto, @Body() payload: WalletOperationBodyDto, @Res({ passthrough: true }) res: ExpressResponse) {
-    const transaction = await send<TransactionModel>(this.walletService, WalletPattern.DEBIT, { ...payload, walletId: params.id });
+    const transaction = await send<TransactionModel>(this.walletService, WalletPattern.DEBIT, { ...payload, walletId: params.id, userId: currentUser.id });
 
     await this.redis.del(`wallets:${currentUser.id}`);
     res.status(HttpStatus.CREATED);
@@ -93,9 +93,10 @@ export class WalletController {
   @Get(':id/transactions')
   @ApiOperation({ summary: 'List a wallet ledger' })
   @ApiOkResponse({ description: ResponseMessage.SUCCESS, type: TransactionListResponse })
-  async transactions(@Param() params: UuidParamDto, @Query() query: PaginationDto, @Res({ passthrough: true }) res: ExpressResponse) {
+  async transactions(@CurrentUser() currentUser: UserPayload, @Param() params: UuidParamDto, @Query() query: PaginationDto, @Res({ passthrough: true }) res: ExpressResponse) {
     const result = await send<{ data: TransactionModel[]; meta: any }>(this.walletService, WalletPattern.TRANSACTIONS, {
       walletId: params.id,
+      userId: currentUser.id,
       query: { page: query.page, pageSize: query.pageSize, sort: query.sort },
     });
 
