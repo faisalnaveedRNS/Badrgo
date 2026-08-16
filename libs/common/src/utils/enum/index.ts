@@ -98,6 +98,7 @@ export enum ResponseCode {
   INVALID_AMOUNT = 664,
   CURRENCY_MISMATCH = 665,
   DUPLICATE_REQUEST = 666,
+  AMOUNT_LIMIT_EXCEEDED = 667,
 
   // Transaction
   TRANSACTION_NOT_FOUND = 670,
@@ -152,6 +153,7 @@ export enum ResponseMessage {
   INVALID_AMOUNT = 'Amount must be greater than zero',
   CURRENCY_MISMATCH = 'Currency does not match the wallet currency',
   DUPLICATE_REQUEST = 'A transaction with this idempotency key has already been accepted',
+  AMOUNT_LIMIT_EXCEEDED = 'Amount exceeds the maximum of 10,000,000 per transaction',
 
   // Transaction
   TRANSACTION_NOT_FOUND = 'Transaction not found',

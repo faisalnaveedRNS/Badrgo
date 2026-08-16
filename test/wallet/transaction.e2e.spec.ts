@@ -52,6 +52,13 @@ describe('POST /wallet/:id/credit', () => {
     }
   });
 
+  it('rejects an amount above the 10,000,000 per-transaction ceiling', async () => {
+    const response = await helper.credit(token, walletId, '10000000.01');
+
+    expect(response.statusCode).toBe(HttpStatus.BAD_REQUEST);
+    expect(response.body.statusCode).toBe(ResponseCode.AMOUNT_LIMIT_EXCEEDED);
+  });
+
   it('rejects a currency that is not the wallet currency', async () => {
     const response = await helper.credit(token, walletId, '10.00', { currency: 'USD' });
 
@@ -92,6 +99,16 @@ describe('POST /wallet/:id/debit', () => {
     expect(response.statusCode).toBe(HttpStatus.BAD_REQUEST);
     expect(response.body.statusCode).toBe(ResponseCode.INSUFFICIENT_BALANCE);
     expect(response.body.message).toBe(ResponseMessage.INSUFFICIENT_BALANCE);
+
+    const wallet = await helper.http().get(`/wallet/${walletId}`).set(helper.authed(token));
+    expect(wallet.body.data.balance).toBe('324.50000000');
+  });
+
+  it('rejects an amount above the ceiling before it ever checks the balance', async () => {
+    const response = await helper.debit(token, walletId, '20000000.00');
+
+    expect(response.statusCode).toBe(HttpStatus.BAD_REQUEST);
+    expect(response.body.statusCode).toBe(ResponseCode.AMOUNT_LIMIT_EXCEEDED);
 
     const wallet = await helper.http().get(`/wallet/${walletId}`).set(helper.authed(token));
     expect(wallet.body.data.balance).toBe('324.50000000');

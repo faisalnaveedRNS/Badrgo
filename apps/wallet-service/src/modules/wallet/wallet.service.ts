@@ -10,11 +10,19 @@ import { TransactionService } from '@wallet/modules/transaction/transaction.serv
 import { TransactionView } from '@wallet/modules/transaction/views/transaction.view';
 import { Wallet } from './entities/wallet.entity';
 import { WalletView } from './views/wallet.view';
-import { CurrencyMismatch, InsufficientBalance, InvalidAmount, WalletAlreadyExists, WalletInactive, WalletNotFound } from './wallet.exception';
+import { AmountLimitExceeded, CurrencyMismatch, InsufficientBalance, InvalidAmount, WalletAlreadyExists, WalletInactive, WalletNotFound } from './wallet.exception';
 
 /** Money is decimal all the way through — parsed only to compare, never to store. */
 const toAmount = (value: string | number): number => Number(value);
 const format = (value: number): string => value.toFixed(8);
+
+/**
+ * Per-transaction ceiling for a single credit or debit. Enforced here rather
+ * than in the DTO so it cannot be bypassed: `post` is the only path that moves
+ * money, and every caller reaches it. Not a daily or cumulative limit — a
+ * caller may still post several movements that together exceed it.
+ */
+const MAX_TRANSACTION_AMOUNT = 10_000_000;
 
 @Injectable()
 export class WalletService {
@@ -84,6 +92,7 @@ export class WalletService {
   private async post(payload: WalletOperationDto, type: TransactionType): Promise<TransactionView> {
     const amount = toAmount(payload.amount);
     if (!Number.isFinite(amount) || amount <= 0) new InvalidAmount();
+    if (amount > MAX_TRANSACTION_AMOUNT) new AmountLimitExceeded();
 
     const posted = await this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, { where: { id: payload.walletId }, lock: { mode: 'pessimistic_write' } });
