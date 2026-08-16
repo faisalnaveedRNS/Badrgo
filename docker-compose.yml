@@ -66,6 +66,27 @@ services:
       retries: 15
       start_period: 30s
 
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    container_name: badrgo-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: badrgo
+      # Internal listener — the UI runs inside the compose network.
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: 'true'
+    ports:
+      - '${KAFKA_UI_PORT:-8080}:8080'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/actuator/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
   clickhouse:
     image: clickhouse/clickhouse-server:24.8-alpine
     container_name: badrgo-clickhouse
