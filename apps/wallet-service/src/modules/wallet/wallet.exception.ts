@@ -62,6 +62,18 @@ export class InvalidAmount extends Exception {
   }
 }
 
+export class AmountLimitExceeded extends Exception {
+  @ApiProperty({ example: ResponseCode.AMOUNT_LIMIT_EXCEEDED })
+  statusCode: number;
+
+  @ApiProperty({ example: ResponseMessage.AMOUNT_LIMIT_EXCEEDED })
+  message: string;
+
+  constructor() {
+    super(ResponseCode.AMOUNT_LIMIT_EXCEEDED, ResponseMessage.AMOUNT_LIMIT_EXCEEDED);
+  }
+}
+
 export class CurrencyMismatch extends Exception {
   @ApiProperty({ example: ResponseCode.CURRENCY_MISMATCH })
   statusCode: number;

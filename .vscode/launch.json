@@ -1,0 +1,95 @@
+{
+  // Debug the monorepo's four processes. Each entry runs the service's main.ts
+  // through ts-node with the tsconfig path aliases registered, so breakpoints
+  // hit the TypeScript sources directly — no build step required.
+  //
+  // Use the "All Services" compound to bring the whole stack up at once; its
+  // members start in dependency order (services first, gateway last).
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Gateway",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/gateway/src/main.ts",
+      "runtimeArgs": ["-r", "ts-node/register", "-r", "tsconfig-paths/register"],
+      "cwd": "${workspaceFolder}",
+      "env": { "NODE_ENV": "development", "TS_NODE_TRANSPILE_ONLY": "true" },
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"],
+      "restart": true
+    },
+    {
+      "name": "User Service",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/user-service/src/main.ts",
+      "runtimeArgs": ["-r", "ts-node/register", "-r", "tsconfig-paths/register"],
+      "cwd": "${workspaceFolder}",
+      "env": { "NODE_ENV": "development", "TS_NODE_TRANSPILE_ONLY": "true" },
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"],
+      "restart": true
+    },
+    {
+      "name": "Wallet Service",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/wallet-service/src/main.ts",
+      "runtimeArgs": ["-r", "ts-node/register", "-r", "tsconfig-paths/register"],
+      "cwd": "${workspaceFolder}",
+      "env": { "NODE_ENV": "development", "TS_NODE_TRANSPILE_ONLY": "true" },
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"],
+      "restart": true
+    },
+    {
+      "name": "Report Service",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/report-service/src/main.ts",
+      "runtimeArgs": ["-r", "ts-node/register", "-r", "tsconfig-paths/register"],
+      "cwd": "${workspaceFolder}",
+      "env": { "NODE_ENV": "development", "TS_NODE_TRANSPILE_ONLY": "true" },
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"],
+      "restart": true
+    },
+    {
+      // Attaches to a service already started with `npm run start:<name> --
+      // --inspect`, so nodemon keeps owning the reload and the debugger
+      // reconnects after each restart.
+      "name": "Attach to Running Service",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+    },
+    {
+      "name": "E2E Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/.bin/jest",
+      "args": ["--config", "./test/jest-e2e.json", "--runInBand", "--detectOpenHandles", "--forceExit"],
+      "cwd": "${workspaceFolder}",
+      "env": { "NODE_ENV": "test" },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "All Services",
+      "configurations": ["User Service", "Wallet Service", "Report Service", "Gateway"],
+      "stopAll": true,
+      "presentation": { "group": "1-compound", "order": 1 }
+    }
+  ]
+}
